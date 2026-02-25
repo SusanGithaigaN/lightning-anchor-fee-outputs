@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # Bitcoin Core (Regtest)
+  bitcoin:
+    image: lncm/bitcoind:v26.0
+    container_name: bitcoin-regtest
+    ports:
+      - "18443:18443"
+      - "18444:18444"
+    volumes:
+      - ./docker/bitcoin:/data/.bitcoin
+    environment:
+      - BITCOIN_DATA=/data/.bitcoin
+    command:
+      - "-regtest"
+      - "-server"
+      - "-rpcuser=bitcoinrpc"
+      - "-rpcpassword=changeme"
+      - "-rpcallowip=0.0.0.0/0"
+      - "-rpcbind=0.0.0.0"
+      - "-zmqpubrawblock=tcp://0.0.0.0:28332"
+      - "-zmqpubrawtx=tcp://0.0.0.0:28333"
+      - "-fallbackfee=0.00001"
+      - "-txindex=1"
+
+  # LND (Lightning Network Daemon)
+  lnd:
+    image: lightninglabs/lnd:v0.17.4-beta
+    container_name: lnd-alice
+    ports:
+      - "10009:10009"
+      - "9735:9735"
+    volumes:
+      - ./docker/lnd:/root/.lnd
+    depends_on:
+      - bitcoin
+    command:
+      - "--bitcoin.active"
+      - "--bitcoin.regtest"
+      - "--bitcoin.node=bitcoind"
+      - "--bitcoind.rpchost=bitcoin:18443"
+      - "--bitcoind.rpcuser=bitcoinrpc"
+      - "--bitcoind.rpcpass=changeme"
+      - "--bitcoind.zmqpubrawblock=tcp://bitcoin:28332"
+      - "--bitcoind.zmqpubrawtx=tcp://bitcoin:28333"
+      - "--listen=0.0.0.0:9735"
+      - "--rpclisten=0.0.0.0:10009"
+      - "--restlisten=0.0.0.0:8080"
+      - "--noseedbackup"
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres-db
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: anchor_service
+    volumes:
+      - ./docker/postgres:/var/lib/postgresql/data
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: redis-cache
+    ports:
+      - "6380:6379"
+    volumes:
+      - ./docker/redis:/data
