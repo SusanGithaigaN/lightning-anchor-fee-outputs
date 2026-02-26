@@ -3,8 +3,10 @@ import dotenv from 'dotenv';
 import { logger } from './utils/logger';
 import { bitcoinService } from './services/bitcoin/node';
 import { lndService } from './services/lightning/lnd';
+import { anchorMonitor } from './services/feebump/monitor';
 import bitcoinRouter from './api/v1/bitcoin';
 import lightningRouter from './api/v1/lightning';
+import monitorRouter from './api/v1/monitor';
 
 dotenv.config();
 
@@ -30,6 +32,7 @@ app.get('/', (req: Request, res: Response) => {
       health: '/health',
       bitcoin: '/api/v1/bitcoin',
       lightning: '/api/v1/lightning',
+      monitor: '/api/v1/monitor',
     },
   });
 });
@@ -37,6 +40,7 @@ app.get('/', (req: Request, res: Response) => {
 // Mount routers
 app.use('/api/v1/bitcoin', bitcoinRouter);
 app.use('/api/v1/lightning', lightningRouter);
+app.use('/api/v1/monitor', monitorRouter);
 
 async function initializeServices() {
   logger.info('Initializing services...');
@@ -54,6 +58,19 @@ async function initializeServices() {
   
   logger.info('All services initialized');
 }
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  anchorMonitor.stopMonitoring();
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  logger.info('SIGINT received, shutting down gracefully');
+  anchorMonitor.stopMonitoring();
+  process.exit(0);
+});
 
 app.listen(port, async () => {
   logger.info(`Server running on port ${port}`);
