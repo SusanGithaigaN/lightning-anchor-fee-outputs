@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # Bitcoin Core (Regtest)
   bitcoin:
     image: lncm/bitcoind:v26.0
     container_name: bitcoin-regtest
@@ -24,13 +23,13 @@ services:
       - "-fallbackfee=0.00001"
       - "-txindex=1"
 
-  # LND (Lightning Network Daemon)
   lnd:
     image: lightninglabs/lnd:v0.17.4-beta
     container_name: lnd-alice
     ports:
       - "10009:10009"
       - "9735:9735"
+      - "8080:8080"
     volumes:
       - ./docker/lnd:/root/.lnd
     depends_on:
@@ -49,12 +48,11 @@ services:
       - "--restlisten=0.0.0.0:8080"
       - "--noseedbackup"
 
-  # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
     container_name: postgres-db
     ports:
-      - "5433:5432"
+      - "5432:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -62,11 +60,10 @@ services:
     volumes:
       - ./docker/postgres:/var/lib/postgresql/data
 
-  # Redis Cache
   redis:
     image: redis:7-alpine
     container_name: redis-cache
     ports:
-      - "6380:6379"
+      - "6379:6379"
     volumes:
       - ./docker/redis:/data
