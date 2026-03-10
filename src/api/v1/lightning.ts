@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { lndService } from '../../services/lightning/lnd';
+import { lightningService } from '../../services/lightning/lnd';
 import { logger } from '../../utils/logger';
 
 const router = Router();
@@ -7,7 +7,7 @@ const router = Router();
 // Get LND node info
 router.get('/info', async (req: Request, res: Response) => {
   try {
-    const info = await lndService.getInfo();
+    const info = await lightningService.getInfo();
     res.json({
       success: true,
       data: info,
@@ -24,7 +24,7 @@ router.get('/info', async (req: Request, res: Response) => {
 // Get wallet balance
 router.get('/balance', async (req: Request, res: Response) => {
   try {
-    const balance = await lndService.getWalletBalance();
+    const balance = await lightningService.getBalance();
     res.json({
       success: true,
       data: balance,
@@ -41,7 +41,7 @@ router.get('/balance', async (req: Request, res: Response) => {
 // List channels
 router.get('/channels', async (req: Request, res: Response) => {
   try {
-    const channels = await lndService.listChannels();
+    const channels = await lightningService.listChannels();
     res.json({
       success: true,
       data: channels,

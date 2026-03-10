@@ -8,22 +8,16 @@ interface RpcRequest {
   params: any[];
 }
 
-interface RpcResponse<T = any> {
-  result: T;
-  error: any;
-  id: string;
-}
-
 export class BitcoinService {
   private client: AxiosInstance;
 
   constructor() {
     const auth = Buffer.from(
-      `${process.env.BITCOIN_RPC_USER || 'bitcoinrpc'}:${process.env.BITCOIN_RPC_PASSWORD || 'changeme'}`
+      `${process.env.BITCOIN_RPC_USER}:${process.env.BITCOIN_RPC_PASSWORD}`
     ).toString('base64');
 
     this.client = axios.create({
-      baseURL: `http://${process.env.BITCOIN_RPC_HOST || 'localhost'}:${process.env.BITCOIN_RPC_PORT || '18443'}`,
+      baseURL: `http://${process.env.BITCOIN_RPC_HOST}:${process.env.BITCOIN_RPC_PORT}`,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Basic ${auth}`,
@@ -40,115 +34,73 @@ export class BitcoinService {
     };
 
     try {
-      const response = await this.client.post<RpcResponse<T>>('/', request);
+      const response = await this.client.post('/', request);
       
       if (response.data.error) {
-        throw new Error(response.data.error.message || 'RPC error');
+        throw new Error(response.data.error.message);
       }
 
       return response.data.result;
     } catch (error: any) {
-      logger.error(`Bitcoin RPC error: ${method}`, { error: error.message });
+      logger.error('Bitcoin RPC error', {
+        method,
+        error: error.message,
+        response: error.response?.data,
+      });
       throw error;
     }
   }
 
-  // Test connection
-  async testConnection(): Promise<boolean> {
-    try {
-      const info = await this.getBlockchainInfo();
-      logger.info('Bitcoin Core connected', {
-        chain: info.chain,
-        blocks: info.blocks,
-        headers: info.headers,
-      });
-      return true;
-    } catch (error) {
-      logger.error('Bitcoin Core connection failed', { error });
-      return false;
-    }
-  }
-
-  // Get blockchain info
   async getBlockchainInfo() {
-    return await this.call<{
-      chain: string;
-      blocks: number;
-      headers: number;
-      bestblockhash: string;
-      difficulty: number;
-      mediantime: number;
-      verificationprogress: number;
-    }>('getblockchaininfo');
+    return await this.call('getblockchaininfo');
   }
 
-  // Get transaction details
   async getTransaction(txid: string) {
     return await this.call('getrawtransaction', [txid, true]);
   }
 
-  // Get mempool info
+  async getRawMempool(): Promise<string[]> {
+    return await this.call('getrawmempool');
+  }
+
   async getMempoolInfo() {
-    return await this.call<{
-      loaded: boolean;
-      size: number;
-      bytes: number;
-      usage: number;
-      maxmempool: number;
-      mempoolminfee: number;
-    }>('getmempoolinfo');
+    return await this.call('getmempoolinfo');
   }
 
-  // Estimate fee rate
   async estimateFee(blocks: number = 1): Promise<number> {
+    const result = await this.call<{ feerate?: number }>('estimatesmartfee', [blocks]);
+    const satPerByte = result.feerate ? (result.feerate * 100000000) / 1000 : 1;
+    return Math.ceil(satPerByte);
+  }
+
+  /**
+   * Broadcast a raw transaction to the network
+   */
+  async sendRawTransaction(hexString: string): Promise<string> {
+    logger.info('Broadcasting transaction', {
+      size: hexString.length / 2,
+    });
+
     try {
-      const result = await this.call<{
-        feerate?: number;
-        blocks: number;
-      }>('estimatesmartfee', [blocks]);
+      const txid = await this.call<string>('sendrawtransaction', [hexString]);
       
-      // Convert BTC/kB to sats/vbyte
-      const satPerByte = result.feerate ? (result.feerate * 100000000) / 1000 : 1;
-      return Math.ceil(satPerByte);
-    } catch (error) {
-      logger.warn('Fee estimation failed, using fallback', { error });
-      return 1; // Fallback to 1 sat/vbyte for regtest
+      logger.info('Transaction broadcast successful', { txid });
+      
+      return txid;
+    } catch (error: any) {
+      logger.error('Transaction broadcast failed', {
+        error: error.message,
+      });
+      throw new Error(`Broadcast failed: ${error.message}`);
     }
   }
 
-  // Send raw transaction
-  async sendRawTransaction(hex: string): Promise<string> {
-    return await this.call<string>('sendrawtransaction', [hex]);
-  }
-
-  // Get UTXO
-  async getUtxo(txid: string, vout: number) {
-    return await this.call('gettxout', [txid, vout]);
-  }
-
-  // Get raw mempool
-  async getRawMempool() {
-    return await this.call<string[]>('getrawmempool');
-  }
-
-  // Generate blocks (for testing)
-  async generateBlocks(blocks: number): Promise<string[]> {
-    try {
-      return await this.call<string[]>('generatetoaddress', [
-        blocks,
-        await this.getNewAddress(),
-      ]);
-    } catch (error) {
-      logger.error('Failed to generate blocks', { error });
-      throw error;
-    }
-  }
-
-  // Get new address (for testing)
-  private async getNewAddress(): Promise<string> {
-    return await this.call<string>('getnewaddress');
+  /**
+   * Test mempool acceptance without broadcasting
+   */
+  async testMempoolAccept(hexString: string) {
+    return await this.call('testmempoolaccept', [[hexString]]);
   }
 }
 
 export const bitcoinService = new BitcoinService();
-

@@ -1,21 +1,26 @@
 import express, { Express, Request, Response } from 'express';
 import dotenv from 'dotenv';
 import { logger } from './utils/logger';
-import { bitcoinService } from './services/bitcoin/node';
-import { lndService } from './services/lightning/lnd';
-import { anchorMonitor } from './services/feebump/monitor';
-import bitcoinRouter from './api/v1/bitcoin';
-import lightningRouter from './api/v1/lightning';
-import monitorRouter from './api/v1/monitor';
 
+// Import routes
+import bitcoinRoutes from './api/v1/bitcoin';
+import lightningRoutes from './api/v1/lightning';
+import monitorRoutes from './api/v1/monitor';
+import feebumpRoutes from './api/v1/feebump';
+import lightningPaymentRoutes from './api/v1/lightning-payment';
+import broadcastRoutes from './api/v1/broadcast';
+
+// Load environment variables
 dotenv.config();
 
 const app: Express = express();
 const port = process.env.PORT || 3000;
 
+// Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Health check endpoint
 app.get('/health', (req: Request, res: Response) => {
   res.json({
     status: 'ok',
@@ -24,59 +29,34 @@ app.get('/health', (req: Request, res: Response) => {
   });
 });
 
+// Root endpoint
 app.get('/', (req: Request, res: Response) => {
   res.json({
     message: 'Lightning Anchor Fee Bumping Service',
     version: '0.1.0',
+    status: 'running',
     endpoints: {
-      health: '/health',
       bitcoin: '/api/v1/bitcoin',
       lightning: '/api/v1/lightning',
       monitor: '/api/v1/monitor',
+      feebump: '/api/v1/feebump',
     },
   });
 });
 
-// Mount routers
-app.use('/api/v1/bitcoin', bitcoinRouter);
-app.use('/api/v1/lightning', lightningRouter);
-app.use('/api/v1/monitor', monitorRouter);
+// API routes
+app.use('/api/v1/bitcoin', bitcoinRoutes);
+app.use('/api/v1/lightning', lightningRoutes);
+app.use('/api/v1/lightning', lightningPaymentRoutes);
+app.use('/api/v1/monitor', monitorRoutes);
+app.use('/api/v1/feebump', feebumpRoutes);
+app.use('/api/v1/feebump', broadcastRoutes);
 
-async function initializeServices() {
-  logger.info('Initializing services...');
-  
-  const bitcoinConnected = await bitcoinService.testConnection();
-  if (!bitcoinConnected) {
-    logger.error('Failed to connect to Bitcoin Core');
-    process.exit(1);
-  }
-  
-  const lndConnected = await lndService.testConnection();
-  if (!lndConnected) {
-    logger.warn('Failed to connect to LND (continuing anyway)');
-  }
-  
-  logger.info('All services initialized');
-}
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  anchorMonitor.stopMonitoring();
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  logger.info('SIGINT received, shutting down gracefully');
-  anchorMonitor.stopMonitoring();
-  process.exit(0);
-});
-
-app.listen(port, async () => {
+// Start server
+app.listen(port, () => {
   logger.info(`Server running on port ${port}`);
   logger.info(`Environment: ${process.env.NODE_ENV}`);
   logger.info(`Health check: http://localhost:${port}/health`);
-  await initializeServices();
 });
 
 export default app;

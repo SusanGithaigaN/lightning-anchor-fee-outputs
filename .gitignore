@@ -42,5 +42,5 @@ coverage/
 # Prisma
 prisma/migrations/
 
-README.md
-Setup-guide.md
+debug.md
+/src/services/bitcoin/node.ts.backup
