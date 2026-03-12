@@ -1,5 +1,7 @@
-import express, { Express, Request, Response } from 'express';
 import dotenv from 'dotenv';
+// Load environment variables
+dotenv.config();
+import express, { Express, Request, Response } from 'express';
 import { logger } from './utils/logger';
 
 // Import routes
@@ -9,9 +11,6 @@ import monitorRoutes from './api/v1/monitor';
 import feebumpRoutes from './api/v1/feebump';
 import lightningPaymentRoutes from './api/v1/lightning-payment';
 import broadcastRoutes from './api/v1/broadcast';
-
-// Load environment variables
-dotenv.config();
 
 const app: Express = express();
 const port = process.env.PORT || 3000;

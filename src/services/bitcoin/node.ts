@@ -16,8 +16,20 @@ export class BitcoinService {
       `${process.env.BITCOIN_RPC_USER}:${process.env.BITCOIN_RPC_PASSWORD}`
     ).toString('base64');
 
+    const host = process.env.BITCOIN_RPC_HOST || 'localhost';
+    const port = process.env.BITCOIN_RPC_PORT || '18443';
+    // # Add this temporarily to src / services / bitcoin / node.ts constructor
+    console.log('BITCOIN_RPC_USER:', process.env.BITCOIN_RPC_USER);
+    console.log('BITCOIN_RPC_PASSWORD:', process.env.BITCOIN_RPC_PASSWORD);
+    console.log('BITCOIN_RPC_HOST:', process.env.BITCOIN_RPC_HOST);
+
+    // Ensure URL has protocol
+    const baseURL = host.startsWith('http')
+      ? `${host}:${port}`
+      : `http://${host}:${port}`;
+
     this.client = axios.create({
-      baseURL: `http://${process.env.BITCOIN_RPC_HOST}:${process.env.BITCOIN_RPC_PORT}`,
+      baseURL,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Basic ${auth}`,
@@ -35,7 +47,7 @@ export class BitcoinService {
 
     try {
       const response = await this.client.post('/', request);
-      
+
       if (response.data.error) {
         throw new Error(response.data.error.message);
       }
@@ -72,10 +84,7 @@ export class BitcoinService {
     const satPerByte = result.feerate ? (result.feerate * 100000000) / 1000 : 1;
     return Math.ceil(satPerByte);
   }
-
-  /**
-   * Broadcast a raw transaction to the network
-   */
+  // Broadcast a raw transaction to the network
   async sendRawTransaction(hexString: string): Promise<string> {
     logger.info('Broadcasting transaction', {
       size: hexString.length / 2,
@@ -83,9 +92,9 @@ export class BitcoinService {
 
     try {
       const txid = await this.call<string>('sendrawtransaction', [hexString]);
-      
+
       logger.info('Transaction broadcast successful', { txid });
-      
+
       return txid;
     } catch (error: any) {
       logger.error('Transaction broadcast failed', {
@@ -95,9 +104,7 @@ export class BitcoinService {
     }
   }
 
-  /**
-   * Test mempool acceptance without broadcasting
-   */
+  // Test mempool acceptance without broadcasting
   async testMempoolAccept(hexString: string) {
     return await this.call('testmempoolaccept', [[hexString]]);
   }
