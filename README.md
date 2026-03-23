@@ -105,39 +105,21 @@ npm install
 
 Copy the example environment file:
 
+### Backend
+
 ```bash
+cd backend
 cp .env.example .env
+# Edit `.env` with your configuration:
 ```
 
-Edit `.env` with your configuration:
 
-```env
-# Server
-NODE_ENV=development
-PORT=3000
+### Frontend
 
-# Bitcoin Core
-BITCOIN_RPC_HOST=localhost
-BITCOIN_RPC_PORT=18443
-BITCOIN_RPC_USER=bitcoinrpc
-BITCOIN_RPC_PASSWORD=your_password
-BITCOIN_NETWORK=regtest
-
-# LND
-LND_GRPC_HOST=localhost:10009
-LND_TLS_CERT_PATH=/path/to/tls.cert
-LND_MACAROON_PATH=/path/to/admin.macaroon
-
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/anchor_service
-
-# Redis
-REDIS_URL=redis://localhost:6379
-
-# Service Configuration
-MIN_FEE_RATE=10
-MAX_FEE_RATE=500
-RESERVE_AMOUNT=100000000
+```bash
+cd frontend
+cp .env.example .env
+# Edit `.env` with your configuration:
 ```
 
 ### 4. Database Setup
@@ -202,33 +184,44 @@ Visit: `http://localhost:3000/health`
 
 ```
 lightning-anchor-fee-outputs/
-├── src/
-│   ├── api/v1/              # API endpoints
-│   │   ├── bitcoin.ts       # Bitcoin RPC endpoints
-│   │   ├── broadcast.ts     # Payment-gated CPFP broadcast
-│   │   ├── feebump.ts       # Fee estimation & CPFP creation
-│   │   ├── lightning.ts     # LND info endpoints
-│   │   ├── lightning-payment.ts  # Invoice & payment endpoints
-│   │   └── monitor.ts       # Monitoring control
-│   ├── services/
-│   │   ├── bitcoin/
-│   │   │   └── node.ts      # Bitcoin Core RPC integration
-│   │   ├── feebump/
-│   │   │   ├── cpfp.ts      # CPFP transaction builder
-│   │   │   └── monitor.ts   # Mempool monitoring
-│   │   └── lightning/
-│   │       ├── lnd.ts       # LND REST API client
-│   │       └── payment.ts   # Invoice & payment service
-│   ├── utils/
-│   │   └── logger.ts        # Winston logger
-│   └── index.ts             # Main entry point
-├── docker/                   # Docker volumes (gitignored)
-├── logs/                     # Application logs (gitignored)
-├── scripts/
-│   └── setup.sh             # Setup script
-├── docker-compose.yml
-├── package.json
-└── tsconfig.json
+├── .gitignore                    # Root (ignores everything)
+├── README.md                     # Root
+├── backend/
+|   ├── src/
+|   │   ├── api/v1/              # API endpoints
+|   │   │   ├── bitcoin.ts       # Bitcoin RPC endpoints
+|   │   │   ├── broadcast.ts     # Payment-gated CPFP broadcast
+|   │   │   ├── feebump.ts       # Fee estimation & CPFP creation
+|   │   │   ├── lightning.ts     # LND info endpoints
+|   │   │   ├── lightning-payment.ts  # Invoice & payment endpoints
+|   │   │   └── monitor.ts       # Monitoring control
+|   │   ├── services/
+|   │   │   ├── bitcoin/
+|   │   │   │   └── node.ts      # Bitcoin Core RPC integration
+|   │   │   ├── feebump/
+|   │   │   │   ├── cpfp.ts      # CPFP transaction builder
+|   │   │   │   └── monitor.ts   # Mempool monitoring
+|   │   │   └── lightning/
+|   │   │       ├── lnd.ts       # LND REST API client
+|   │   │       └── payment.ts   # Invoice & payment service
+|   │   ├── utils/
+|   │   │   └── logger.ts        # Winston logger
+|   │   └── index.ts             # Main entry point
+|   ├── docker/                   # Docker volumes (gitignored)
+|   ├── logs/                     # Application logs (gitignored)
+|   ├── scripts/
+|   │   └── setup.sh             # Setup script
+|   ├── docker-compose.yml
+|   ├── package.json
+|   └── tsconfig.json
+|
+└── frontend/
+    ├── src/
+    ├── public/
+    ├── package.json
+    ├── tsconfig.json
+    ├── vite.config.ts
+    └── .env.example  
 ```
 
 ---
@@ -306,6 +299,9 @@ curl -X POST http://localhost:3000/api/v1/feebump/estimate \
 - [Part 1: The Basics](https://dev.to/susangithaigan/understanding-lightning-network-anchor-outputs-part-1-the-basics-2p7j)
 - [Part 2: Technical Deep Dive](https://dev.to/susangithaigan/lightning-network-anchor-outputs-explained-the-basics-part-1-27en)
 - [Part 3: Setup & Implementation](https://dev.to/susangithaigan/building-an-anchor-output-fee-bumping-service-part-3-setup-implementation-pef)
+- [Part 4: Lightning Payment Integration](https://dev.to/susangithaigan/building-an-anchor-output-fee-bumping-service-part-4-lightning-payment-integration-5615)
+- [Part 5: CPFP Transactions and Broadcasting](https://dev.to/susangithaigan/building-an-anchor-output-fee-bumping-service-part-5-cpfp-transactions-and-broadcasting-2mpb)
+- [Part 6: Setting up the frontend and testing the application](TBA)
 
 ### External Resources
 - [Bitcoin Optech: Anchor Outputs](https://bitcoinops.org/en/topics/anchor-outputs/)
