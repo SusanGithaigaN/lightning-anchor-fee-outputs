@@ -1,28 +1,44 @@
 # Dependencies
 node_modules/
+*/node_modules/
+**/node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-lock.yaml
+bun.lockb
 
 # Build output
 dist/
 build/
 *.tsbuildinfo
+backend/dist/
+frontend/dist/
 
 # Environment variables
 .env
 .env.local
 .env.*.local
+backend/.env
+backend/.env.local
+frontend/.env
+frontend/.env.local
 
 # Logs
 logs/
 *.log
+backend/logs/
+frontend/logs/
 
 # Docker volumes
 docker/bitcoin/
 docker/lnd/
 docker/postgres/
 docker/redis/
+backend/docker/bitcoin/
+backend/docker/lnd/
+backend/docker/postgres/
+backend/docker/redis/
 
 # IDE
 .vscode/
@@ -39,8 +55,11 @@ Thumbs.db
 coverage/
 .nyc_output/
 
-# Prisma
-prisma/migrations/
-
+# Temporary files
 debug.md
-/src/services/bitcoin/node.ts.backup
+*.backup
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/

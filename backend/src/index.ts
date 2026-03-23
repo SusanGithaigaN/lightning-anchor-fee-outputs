@@ -1,6 +1,8 @@
 import dotenv from 'dotenv';
+import path from 'path';
 // Load environment variables
-dotenv.config();
+// dotenv.config();
+dotenv.config({ path: path.join(__dirname, '../.env') });
 import express, { Express, Request, Response } from 'express';
 import { logger } from './utils/logger';
 

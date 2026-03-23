@@ -36,6 +36,7 @@
     "bip39": "^3.1.0",
     "bitcoin-core": "^5.0.0",
     "bitcoinjs-lib": "^7.0.1",
+    "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "ecpair": "^3.0.1",
     "electrum-client": "^0.0.6",
