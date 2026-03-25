@@ -1,17 +1,18 @@
-import axios, { AxiosInstance } from 'axios';
+import * as grpc from '@grpc/grpc-js';
+import * as protoLoader from '@grpc/proto-loader';
 import * as fs from 'fs';
-import * as https from 'https';
+import * as path from 'path';
 import { logger } from '../../utils/logger';
 
 interface CreateInvoiceRequest {
-  amount: number; // Amount in satoshis
+  amount: number;
   memo?: string;
-  expiry?: number; // Expiry in seconds (default: 3600)
+  expiry?: number;
 }
 
 interface Invoice {
   paymentHash: string;
-  paymentRequest: string; // The actual invoice (lnbc...)
+  paymentRequest: string;
   amount: number;
   memo: string;
   expiresAt: Date;
@@ -26,217 +27,147 @@ interface PaymentStatus {
 }
 
 export class LightningService {
-  private client: AxiosInstance;
-  private macaroon: string;
+  private lightning: any;
 
   constructor() {
-    // Read the admin macaroon
-    const macaroonPath = process.env.LND_MACAROON_PATH || './docker/lnd/data/chain/bitcoin/regtest/admin.macaroon';
-    const macaroonHex = fs.readFileSync(macaroonPath).toString('hex');
-    this.macaroon = macaroonHex;
-
-    // Read TLS cert for HTTPS
+    const grpcHost = process.env.LND_GRPC_HOST || 'localhost:10009';
     const tlsCertPath = process.env.LND_TLS_CERT_PATH || './docker/lnd/tls.cert';
+    const macaroonPath = process.env.LND_MACAROON_PATH || './docker/lnd/data/chain/bitcoin/regtest/admin.macaroon';
+
+    // Load proto
+    const protoPath = path.join(__dirname, 'rpc.proto');
+    const packageDef = protoLoader.loadSync(protoPath, {
+      keepCase: true,
+      longs: String,
+      enums: String,
+      defaults: true,
+      oneofs: true,
+    });
+    const lnrpc = (grpc.loadPackageDefinition(packageDef) as any).lnrpc;
+
+    // TLS credentials
     const tlsCert = fs.readFileSync(tlsCertPath);
+    const sslCreds = grpc.credentials.createSsl(tlsCert);
 
-    // Create HTTPS agent with the TLS cert
-    const httpsAgent = new https.Agent({
-      ca: tlsCert,
-      rejectUnauthorized: false, // For regtest, we can be less strict
+    // Macaroon credentials
+    const macaroonHex = fs.readFileSync(macaroonPath).toString('hex');
+    const macaroonCreds = grpc.credentials.createFromMetadataGenerator((_, callback) => {
+      const metadata = new grpc.Metadata();
+      metadata.add('macaroon', macaroonHex);
+      callback(null, metadata);
     });
 
-    // Setup REST client
-    const restHost = process.env.LND_REST_HOST || 'https://localhost:8080';
-    
-    this.client = axios.create({
-      baseURL: restHost,
-      httpsAgent,
-      headers: {
-        'Grpc-Metadata-macaroon': this.macaroon,
-      },
-    });
+    const credentials = grpc.credentials.combineChannelCredentials(sslCreds, macaroonCreds);
 
-    logger.info('Lightning service initialized', {
-      restHost,
+    this.lightning = new lnrpc.Lightning(grpcHost, credentials);
+
+    logger.info('Lightning gRPC service initialized', { grpcHost });
+  }
+
+  private call(method: string, params: object): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.lightning[method](params, (err: any, res: any) => {
+        if (err) reject(err);
+        else resolve(res);
+      });
     });
   }
 
-  /**
-   * Get LND node info
-   */
   async getInfo() {
-    try {
-      const response = await this.client.get('/v1/getinfo');
-      return response.data;
-    } catch (error: any) {
-      logger.error('Error getting LND info', { error: error.message });
-      throw error;
-    }
+    return this.call('getInfo', {});
   }
 
-  /**
-   * Get wallet balance
-   */
   async getBalance() {
-    try {
-      const response = await this.client.get('/v1/balance/blockchain');
-      return response.data;
-    } catch (error: any) {
-      logger.error('Error getting wallet balance', { error: error.message });
-      throw error;
-    }
+    return this.call('walletBalance', {});
   }
 
-  /**
-   * List channels
-   */
   async listChannels() {
-    try {
-      const response = await this.client.get('/v1/channels');
-      return response.data;
-    } catch (error: any) {
-      logger.error('Error listing channels', { error: error.message });
-      throw error;
-    }
+    return this.call('listChannels', {});
   }
 
-  /**
-   * Create a Lightning invoice for fee bump payment
-   */
   async createInvoice(request: CreateInvoiceRequest): Promise<Invoice> {
     try {
       logger.info('Creating Lightning invoice', {
-        amount: request.amount,
+        amountSats: request.amount,
         memo: request.memo,
       });
 
-      const expiry = request.expiry || 3600; // 1 hour default
+      const expiry = request.expiry || 3600;
 
-      const response = await this.client.post('/v1/invoices', {
-        value: request.amount.toString(),
+      const response = await this.call('addInvoice', {
+        value: request.amount,
         memo: request.memo || 'CPFP Fee Bump Service',
-        expiry: expiry.toString(),
+        expiry,
       });
 
-      const data = response.data;
+      const paymentHash = Buffer.from(response.r_hash, 'base64').toString('hex');
 
-      logger.info('Invoice created', {
-        paymentHash: data.r_hash,
-        paymentRequest: data.payment_request,
+      logger.info('Invoice created successfully', {
+        paymentHash,
+        paymentRequest: response.payment_request?.substring(0, 30) + '...',
       });
 
       return {
-        paymentHash: Buffer.from(data.r_hash, 'base64').toString('hex'),
-        paymentRequest: data.payment_request,
+        paymentHash,
+        paymentRequest: response.payment_request,
         amount: request.amount,
         memo: request.memo || 'CPFP Fee Bump Service',
         expiresAt: new Date(Date.now() + expiry * 1000),
         createdAt: new Date(),
       };
     } catch (error: any) {
-      logger.error('Error creating invoice', { 
-        error: error.message,
-        response: error.response?.data,
-      });
-      throw error;
+      logger.error('Error creating invoice', { error: error.message });
+      throw new Error(`Failed to create invoice: ${error.message}`);
     }
   }
 
-  /**
-   * Check if an invoice has been paid
-   */
   async checkPayment(paymentHash: string): Promise<PaymentStatus> {
     try {
-      logger.debug('Checking payment status', { paymentHash });
+      const paymentHashBytes = Buffer.from(paymentHash, 'hex');
 
-      // Convert hex payment hash to base64 for LND API
-      const paymentHashBase64 = Buffer.from(paymentHash, 'hex').toString('base64');
-
-      const response = await this.client.get(`/v1/invoice/${paymentHashBase64}`);
-      const invoice = response.data;
-
-      const paid = invoice.state === 'SETTLED';
-      const settled = invoice.settled || false;
-
-      logger.debug('Payment status', {
-        paymentHash,
-        state: invoice.state,
-        paid,
-        settled,
+      const response = await this.call('lookupInvoice', {
+        r_hash: paymentHashBytes,
       });
+
+      const paid = response.state === 'SETTLED';
 
       return {
         paid,
-        settled,
-        settleDate: settled ? new Date(parseInt(invoice.settle_date) * 1000) : undefined,
-        amountPaid: settled ? parseInt(invoice.amt_paid_sat) : undefined,
+        settled: paid,
+        settleDate: paid ? new Date(parseInt(response.settle_date) * 1000) : undefined,
+        amountPaid: paid ? parseInt(response.amt_paid_sat) : undefined,
       };
     } catch (error: any) {
-      logger.error('Error checking payment', { 
-        paymentHash,
-        error: error.message,
-        response: error.response?.data,
-      });
+      logger.error('Error checking payment', { paymentHash, error: error.message });
       throw error;
     }
   }
 
-  /**
-   * Decode a Lightning invoice (payment request)
-   */
   async decodeInvoice(paymentRequest: string) {
-    try {
-      const response = await this.client.get(`/v1/payreq/${paymentRequest}`);
-      return response.data;
-    } catch (error: any) {
-      logger.error('Error decoding invoice', { error: error.message });
-      throw error;
-    }
+    return this.call('decodePayReq', { pay_req: paymentRequest });
   }
 
-  /**
-   * Subscribe to invoice updates (for real-time payment detection)
-   * Returns a promise that resolves when the invoice is paid
-   */
   async waitForPayment(paymentHash: string, timeoutMs: number = 3600000): Promise<boolean> {
     const startTime = Date.now();
-    
-    logger.info('Waiting for payment', { paymentHash, timeoutMs });
+    logger.info('Waiting for payment', { paymentHash });
 
-    // Poll every 2 seconds
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const checkInterval = setInterval(async () => {
-        try {
-          // Check if timeout exceeded
-          if (Date.now() - startTime > timeoutMs) {
-            clearInterval(checkInterval);
-            logger.warn('Payment wait timeout', { paymentHash });
-            resolve(false);
-            return;
-          }
-
-          // Check payment status
-          const status = await this.checkPayment(paymentHash);
-          
-          if (status.paid && status.settled) {
-            clearInterval(checkInterval);
-            logger.info('Payment received!', { 
-              paymentHash,
-              amountPaid: status.amountPaid,
-              settleDate: status.settleDate,
-            });
-            resolve(true);
-            return;
-          }
-
-        } catch (error: any) {
-          logger.error('Error in payment polling', { 
-            paymentHash,
-            error: error.message,
-          });
-          // Continue polling even on errors
+        if (Date.now() - startTime > timeoutMs) {
+          clearInterval(checkInterval);
+          resolve(false);
+          return;
         }
-      }, 2000); // Check every 2 seconds
+        try {
+          const status = await this.checkPayment(paymentHash);
+          if (status.paid) {
+            clearInterval(checkInterval);
+            resolve(true);
+          }
+        } catch {
+          // continue polling
+        }
+      }, 2000);
     });
   }
 }
