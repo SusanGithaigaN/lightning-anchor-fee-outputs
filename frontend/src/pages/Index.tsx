@@ -13,6 +13,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { NetworkStatusIndicator } from "@/components/NetworkStatusIndicator";
 import { toast } from "sonner";
 import { Zap } from "lucide-react";
+import Footer from "@/components/landing/footer";
 
 export default function Index() {
   const [txid, setTxid] = useState("");
@@ -109,7 +110,7 @@ export default function Index() {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight">Lightning Fee Bumper</h1>
-              <p className="text-sm text-muted-foreground">CPFP Fee Bumping via Lightning Network Anchor Outputs</p>
+              <p className="hidden md:block md:text-sm text-muted-foreground">CPFP Fee Bumping on the Lightning Network</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -122,7 +123,7 @@ export default function Index() {
         </div>
       </header>
 
-      <main className="container max-w-5xl mx-auto px-4 py-8">
+      <main className="container max-w-5xl mx-auto px-4 py-6 md:py-16">
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Left column — main workflow */}
           <div className="lg:col-span-2 space-y-6">
@@ -173,6 +174,7 @@ export default function Index() {
           </div>
         </div>
       </main>
+      <Footer />
     </div>
   );
 }

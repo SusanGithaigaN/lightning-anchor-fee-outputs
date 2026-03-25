@@ -4,6 +4,7 @@ import path from 'path';
 // dotenv.config();
 dotenv.config({ path: path.join(__dirname, '../.env') });
 import express, { Express, Request, Response } from 'express';
+import cors from 'cors';
 import { logger } from './utils/logger';
 
 // Import routes
@@ -18,6 +19,7 @@ const app: Express = express();
 const port = process.env.PORT || 3000;
 
 // Middleware
+app.use(cors()); 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
