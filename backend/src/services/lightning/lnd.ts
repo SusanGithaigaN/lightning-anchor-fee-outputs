@@ -46,11 +46,21 @@ export class LightningService {
     const lnrpc = (grpc.loadPackageDefinition(packageDef) as any).lnrpc;
 
     // TLS credentials
-    const tlsCert = fs.readFileSync(tlsCertPath);
+    // const tlsCert = fs.readFileSync(tlsCertPath);
+    // const sslCreds = grpc.credentials.createSsl(tlsCert);
+
+    // use encoded cert from env
+    const tlsCert = process.env.LND_TLS_CERT_BASE64
+      ? Buffer.from(process.env.LND_TLS_CERT_BASE64, 'base64')
+      : fs.readFileSync(tlsCertPath);
     const sslCreds = grpc.credentials.createSsl(tlsCert);
 
     // Macaroon credentials
-    const macaroonHex = fs.readFileSync(macaroonPath).toString('hex');
+    // const macaroonHex = fs.readFileSync(macaroonPath).toString('hex');
+    const macaroonHex = process.env.LND_MACAROON_BASE64
+      ? Buffer.from(process.env.LND_MACAROON_BASE64, 'base64').toString('hex')
+      : fs.readFileSync(macaroonPath).toString('hex');
+
     const macaroonCreds = grpc.credentials.createFromMetadataGenerator((_, callback) => {
       const metadata = new grpc.Metadata();
       metadata.add('macaroon', macaroonHex);

@@ -77,4 +77,22 @@ router.get('/transaction/:txid', async (req: Request, res: Response) => {
   }
 });
 
+// Get service wallet address for testing
+router.get('/wallet-address', async (req: Request, res: Response) => {
+  try {
+    const { cpfpService } = await import('../../services/feebump/cpfp');
+    const address = cpfpService.getWalletAddress();
+    res.json({
+      success: true,
+      data: { address },
+    });
+  } catch (error) {
+    logger.error('Error fetching wallet address', { error });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch wallet address',
+    });
+  }
+});
+
 export default router;

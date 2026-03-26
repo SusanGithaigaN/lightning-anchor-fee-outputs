@@ -91,7 +91,6 @@ A service that:
 ```bash
 git clone https://github.com/SusanGithaigaN/lightning-anchor-fee-outputs.git
 cd lightning-anchor-fee-outputs
-npm install
 ```
 
 

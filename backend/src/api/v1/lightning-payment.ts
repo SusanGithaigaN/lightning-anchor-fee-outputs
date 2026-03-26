@@ -118,4 +118,51 @@ router.post('/decode-invoice', async (req: Request, res: Response) => {
     }
 });
 
+// Test bypass endpoint .
+// THis will mark an invoice as settled without actual payment
+// POST /api/v1/lightning/simulate-payment (DEV ONLY)
+router.post('/simulate-payment', async (req: Request, res: Response) => {
+    if (process.env.NODE_ENV === 'production') {
+        return res.status(404).json({ success: false, error: 'Not found' });
+    }
+
+    try {
+        const { paymentHash } = req.body;
+
+        if (!paymentHash || paymentHash.length !== 64) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid payment hash (must be 64 character hex string)',
+            });
+        }
+
+        // Use LND CLI to settle the invoice directly
+        const { exec } = await import('child_process');
+        const { promisify } = await import('util');
+        const execAsync = promisify(exec);
+
+        await execAsync(
+            `docker compose exec -T lnd lncli --network=regtest settleinvoice ${paymentHash}`
+        );
+
+        logger.info('Payment simulated for testing', { paymentHash });
+
+        res.json({
+            success: true,
+            data: {
+                paymentHash,
+                simulated: true,
+                message: 'Invoice marked as settled for testing purposes',
+            },
+        });
+    } catch (error: any) {
+        logger.error('Error simulating payment', { error: error.message });
+        res.status(500).json({
+            success: false,
+            error: 'Failed to simulate payment',
+            details: error.message,
+        });
+    }
+});
+
 export default router;

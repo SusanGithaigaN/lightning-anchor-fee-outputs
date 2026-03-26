@@ -1,7 +1,7 @@
 {
   "scripts": {
     "dev": "nodemon --exec ts-node src/index.ts",
-    "build": "tsc",
+    "build": "tsc && mkdir -p dist/services/lightning && cp src/services/lightning/rpc.proto dist/services/lightning/",
     "start": "node dist/index.js",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -16,10 +16,7 @@
   },
   "devDependencies": {
     "@types/bitcoinjs-lib": "^4.0.1",
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
-    "@types/node": "^25.3.0",
     "@types/supertest": "^6.0.3",
     "jest": "^30.2.0",
     "nodemon": "^3.1.14",
@@ -32,6 +29,9 @@
     "@grpc/grpc-js": "^1.14.3",
     "@grpc/proto-loader": "^0.8.0",
     "@mempool/mempool.js": "^3.0.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.5.0",
     "axios": "^1.13.5",
     "bip32": "^5.0.1",
     "bip39": "^3.1.0",

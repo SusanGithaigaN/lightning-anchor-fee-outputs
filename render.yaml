@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: lightning-anchor-fee-outputs
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install --include=dev && npm run build && cp -r src/services/lightning/rpc.proto dist/services/lightning/
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+    autoDeploy: true
