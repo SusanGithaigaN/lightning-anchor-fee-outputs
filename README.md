@@ -300,7 +300,7 @@ curl -X POST http://localhost:3000/api/v1/feebump/estimate \
 - [Part 3: Setup & Implementation](https://dev.to/susangithaigan/building-an-anchor-output-fee-bumping-service-part-3-setup-implementation-pef)
 - [Part 4: Lightning Payment Integration](https://dev.to/susangithaigan/building-an-anchor-output-fee-bumping-service-part-4-lightning-payment-integration-5615)
 - [Part 5: CPFP Transactions and Broadcasting](https://dev.to/susangithaigan/building-an-anchor-output-fee-bumping-service-part-5-cpfp-transactions-and-broadcasting-2mpb)
-- [Part 6: Setting up the frontend and testing the application](TBA)
+- [Part 6: Setting up the frontend and testing the application](https://dev.to/susangithaigan/using-the-lightning-anchor-fee-bumping-service-a-frontend-walkthrough-ge1)
 
 ### External Resources
 - [Bitcoin Optech: Anchor Outputs](https://bitcoinops.org/en/topics/anchor-outputs/)
