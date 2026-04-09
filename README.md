@@ -8,6 +8,25 @@
 
 ---
 
+## Network Environments
+
+This project runs on two distinct environments depending on how you're using it:
+
+| | Deployed App | Local Development |
+|---|---|---|
+| **URL** | [ln-anchor-outputs.netlify.app](https://ln-anchor-outputs.netlify.app/) | `http://localhost:3000` |
+| **Bitcoin Network** | **Mainnet** | **Regtest** |
+| **Bitcoin Node** | Voltage Cloud (hosted) | Bitcoin Core via Docker |
+| **Lightning Node** | Voltage Cloud LND | LND via Docker (`lnd-alice`) |
+| **Real funds?** | ✅ Yes. Use with caution | ❌ No . Test BTC only |
+
+**If you are running this locally**, the setup instructions below configure a fully isolated regtest environment using Docker. No real funds are involved.
+
+**If you are using the deployed app**, it connects to a mainnet Lightning node hosted on [Voltage Cloud](https://voltage.cloud/). Transactions are real and irreversible.
+
+---
+
+
 ## About This Project
 
 This project is part of my **learning journey** documented in my [anchor outputs article series](https://dev.to/susangithaigan/understanding-lightning-network-anchor-outputs-part-1-the-basics-2p7j).
@@ -64,11 +83,8 @@ A service that:
 - Lightning payment verification
 - Payment-gated broadcasting
 - Complete REST API
-
-### In Progress  
 - Transaction signing (needs Lightning channel keys)
 - Database persistence (PostgreSQL ready)
-- Frontend dashboard
 - Production deployment
 
 ---
@@ -301,6 +317,7 @@ curl -X POST http://localhost:3000/api/v1/feebump/estimate \
 - [Part 4: Lightning Payment Integration](https://dev.to/susangithaigan/building-an-anchor-output-fee-bumping-service-part-4-lightning-payment-integration-5615)
 - [Part 5: CPFP Transactions and Broadcasting](https://dev.to/susangithaigan/building-an-anchor-output-fee-bumping-service-part-5-cpfp-transactions-and-broadcasting-2mpb)
 - [Part 6: Setting up the frontend and testing the application](https://dev.to/susangithaigan/using-the-lightning-anchor-fee-bumping-service-a-frontend-walkthrough-ge1)
+- Part 7: Going Live; Connecting a Voltage Cloud Mainnet Node to the Fee Bumping Service
 
 ### External Resources
 - [Bitcoin Optech: Anchor Outputs](https://bitcoinops.org/en/topics/anchor-outputs/)
