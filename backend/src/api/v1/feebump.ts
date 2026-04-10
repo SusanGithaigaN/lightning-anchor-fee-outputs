@@ -9,25 +9,35 @@ const router = Router();
 router.post('/estimate', async (req: Request, res: Response) => {
   try {
     const { txid, anchorVout, targetFeeRate } = req.body;
+    const parsedTargetFeeRate = parseFloat(String(targetFeeRate));
+    const parsedAnchorVout = anchorVout === undefined || anchorVout === null || anchorVout === ''
+      ? undefined
+      : parseInt(String(anchorVout), 10);
 
-    if (!txid || !targetFeeRate) {
+    if (!txid || Number.isNaN(parsedTargetFeeRate)) {
       return res.status(400).json({
         success: false,
-        error: 'Missing required fields: txid, targetFeeRate',
+        error: 'Missing or invalid required fields: txid, targetFeeRate',
+      });
+    }
+
+    if (parsedAnchorVout !== undefined && (Number.isNaN(parsedAnchorVout) || parsedAnchorVout < 0)) {
+      return res.status(400).json({
+        success: false,
+        error: 'anchorVout must be a non-negative integer',
       });
     }
 
     logger.info('Estimating fee bump', {
       txid,
-      anchorVout: anchorVout || 0,
-      targetFeeRate,
+      anchorVout: parsedAnchorVout,
+      targetFeeRate: parsedTargetFeeRate,
     });
 
-    // Use the new estimateFeeBump method
     const estimate = await cpfpService.estimateFeeBump({
       parentTxid: txid,
-      anchorVout: anchorVout || 0,
-      targetFeeRate: parseFloat(targetFeeRate),
+      anchorVout: parsedAnchorVout,
+      targetFeeRate: parsedTargetFeeRate,
     });
 
     res.json({
@@ -37,9 +47,10 @@ router.post('/estimate', async (req: Request, res: Response) => {
 
   } catch (error: any) {
     logger.error('Error estimating fee bump', { error: error.message });
-    res.status(500).json({
+    const isUserInputIssue = /anchor output|330-sat anchor|transaction outputs/i.test(error.message);
+    res.status(isUserInputIssue ? 400 : 500).json({
       success: false,
-      error: 'Failed to estimate fee bump',
+      error: isUserInputIssue ? 'Invalid transaction or anchor selection' : 'Failed to estimate fee bump',
       details: error.message,
     });
   }

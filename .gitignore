@@ -17,6 +17,7 @@ frontend/dist/
 
 # Environment variables
 .env
+or.env
 .env.local
 .env.*.local
 backend/.env
@@ -64,3 +65,6 @@ test-results/
 playwright-report/
 playwright/.cache/
 frontend/.env.example
+
+# mainnet node
+creds/

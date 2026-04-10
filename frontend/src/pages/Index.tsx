@@ -17,8 +17,8 @@ import Footer from "@/components/landing/footer";
 
 export default function Index() {
   const [txid, setTxid] = useState("");
-  const [anchorIndex, setAnchorIndex] = useState(0);
-  const [targetFeeRate, setTargetFeeRate] = useState(10);
+  const [anchorIndex, setAnchorIndex] = useState(1);
+  const [targetFeeRate, setTargetFeeRate] = useState(1);
 
   const [estimate, setEstimate] = useState<FeeEstimate | null>(null);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
@@ -57,7 +57,7 @@ export default function Index() {
 
     try {
       const inv = await api.createInvoice(
-        estimate.totalFeeNeeded,
+        Math.max(1, estimate.childFeeNeeded),
         `CPFP fee bump for ${txid.slice(0, 8)}...`
       );
       setInvoice(inv);

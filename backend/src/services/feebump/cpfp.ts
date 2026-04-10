@@ -10,9 +10,9 @@ const ECPair = ECPairFactory(ecc);
 
 interface CPFPRequest {
   parentTxid: string;
-  anchorVout: number;
-  targetFeeRate: number; 
-  maxFee?: number; 
+  anchorVout?: number;
+  targetFeeRate: number;
+  maxFee?: number;
 }
 
 interface CPFPResult {
@@ -23,23 +23,74 @@ interface CPFPResult {
   error?: string;
 }
 
+function satsFromBtc(value: number): number {
+  return Math.round(value * 100000000);
+}
+
+function resolveAnchorOutput(parentTx: any, requestedVout?: number) {
+  const outputs = Array.isArray(parentTx?.vout) ? parentTx.vout : [];
+  const hasRequestedVout = Number.isInteger(requestedVout)
+    && requestedVout! >= 0
+    && requestedVout! < outputs.length;
+
+  const detectedAnchorVout = outputs.findIndex((output: any) => output && satsFromBtc(output.value) === 330);
+  const requestedOutput = hasRequestedVout ? outputs[requestedVout as number] : undefined;
+  const requestedIsAnchor = requestedOutput ? satsFromBtc(requestedOutput.value) === 330 : false;
+
+  const resolvedVout = requestedIsAnchor
+    ? requestedVout as number
+    : detectedAnchorVout >= 0
+      ? detectedAnchorVout
+      : hasRequestedVout
+        ? requestedVout as number
+        : -1;
+
+  const resolvedOutput = resolvedVout >= 0 ? outputs[resolvedVout] : undefined;
+  const anchorValue = resolvedOutput ? satsFromBtc(resolvedOutput.value) : 0;
+
+  return {
+    outputs,
+    detectedAnchorVout,
+    resolvedVout,
+    resolvedOutput,
+    anchorValue,
+    isAnchorOutput: anchorValue === 330,
+    usedAutoDetectedAnchor: detectedAnchorVout >= 0 && resolvedVout !== requestedVout,
+  };
+}
+
+function resolveBitcoinNetwork(): { name: string; network: bitcoin.Network } {
+  const configuredNetwork = (process.env.BITCOIN_NETWORK || 'regtest').toLowerCase();
+
+  switch (configuredNetwork) {
+    case 'mainnet':
+    case 'bitcoin':
+      return { name: 'mainnet', network: bitcoin.networks.bitcoin };
+    case 'testnet':
+    case 'testnet3':
+      return { name: 'testnet', network: bitcoin.networks.testnet };
+    default:
+      return { name: 'regtest', network: bitcoin.networks.regtest };
+  }
+}
+
 export class CPFPService {
   private network: bitcoin.Network;
   private walletKeyPair: any; 
 
   constructor() {
-    // Use regtest network
-    this.network = bitcoin.networks.regtest;
+    const { name, network } = resolveBitcoinNetwork();
+    this.network = network;
 
-    //Generate a keypair for testing
+    // Generate a keypair for testing
     // In production, you'd load this from a secure wallet
     this.walletKeyPair = ECPair.makeRandom({ network: this.network });
 
     logger.info('CPFP Service initialized', {
-      network: 'regtest',
+      network: name,
       walletAddress: bitcoin.payments.p2wpkh({
         pubkey: this.walletKeyPair.publicKey,
-        network: this.network
+        network: this.network,
       }).address,
     });
   }
@@ -62,24 +113,36 @@ export class CPFPService {
         };
       }
 
-      // Step 2: Verify the anchor output exists and is 330 sats
-      const anchorOutput = parentTx.vout[request.anchorVout];
+      // Step 2: Resolve and verify the 330-sat anchor output
+      const {
+        detectedAnchorVout,
+        resolvedVout,
+        resolvedOutput: anchorOutput,
+        anchorValue,
+        isAnchorOutput,
+        usedAutoDetectedAnchor,
+      } = resolveAnchorOutput(parentTx, request.anchorVout);
+
       if (!anchorOutput) {
         return {
           success: false,
-          error: `Anchor output ${request.anchorVout} not found`,
+          error: detectedAnchorVout >= 0
+            ? `Anchor output ${request.anchorVout} not found. Try output index ${detectedAnchorVout}.`
+            : 'No 330-sat anchor output found on this transaction.',
         };
       }
 
-      const anchorValue = Math.round(anchorOutput.value * 100000000);
-      if (anchorValue !== 330) {
+      if (!isAnchorOutput) {
         return {
           success: false,
-          error: `Output is ${anchorValue} sats, not 330 (not an anchor output)`,
+          error: `Output ${resolvedVout} is ${anchorValue} sats, not 330 (not an anchor output)`,
         };
       }
 
       logger.info('Anchor output verified', {
+        requestedVout: request.anchorVout,
+        resolvedVout,
+        autoDetected: usedAutoDetectedAnchor,
         value: anchorValue,
         scriptPubKey: anchorOutput.scriptPubKey.hex,
       });
@@ -139,7 +202,7 @@ export class CPFPService {
 
       psbt.addInput({
         hash: request.parentTxid,
-        index: request.anchorVout,
+        index: resolvedVout,
         witnessUtxo: {
           script: anchorScriptPubKey,
           value: BigInt(anchorValue),
@@ -272,6 +335,11 @@ export class CPFPService {
   async estimateFeeBump(request: CPFPRequest) {
     try {
       const parentTx = await bitcoinService.getTransaction(request.parentTxid);
+
+      if (!Array.isArray(parentTx?.vout) || parentTx.vout.length === 0) {
+        throw new Error('Transaction outputs could not be read for fee estimation');
+      }
+
       const parentSize = parentTx.vsize || parentTx.size;
       const parentFee = await this.calculateActualFee(request.parentTxid);
       const parentFeeRate = parentFee > 0
@@ -281,10 +349,26 @@ export class CPFPService {
       const childSize = 110;
       const totalSize = parentSize + childSize;
       const totalFeeNeeded = Math.ceil(totalSize * request.targetFeeRate);
-      const childFeeNeeded = totalFeeNeeded - parentFee;
+      const childFeeNeeded = Math.max(0, totalFeeNeeded - parentFee);
 
-      const anchorOutput = parentTx.vout[request.anchorVout];
-      const anchorValue = Math.round(anchorOutput.value * 100000000);
+      const {
+        detectedAnchorVout,
+        resolvedVout,
+        resolvedOutput,
+        anchorValue,
+        isAnchorOutput,
+        usedAutoDetectedAnchor,
+      } = resolveAnchorOutput(parentTx, request.anchorVout);
+
+      if (!resolvedOutput) {
+        throw new Error(
+          detectedAnchorVout >= 0
+            ? `Anchor output ${request.anchorVout} not found. Try output index ${detectedAnchorVout}.`
+            : 'No 330-sat anchor output found on this transaction.'
+        );
+      }
+
+      const feasible = isAnchorOutput && childFeeNeeded <= anchorValue;
 
       return {
         txid: request.parentTxid,
@@ -296,15 +380,23 @@ export class CPFPService {
         targetFeeRate: request.targetFeeRate,
         totalFeeNeeded,
         childFeeNeeded,
+        anchorVout: resolvedVout,
+        detectedAnchorVout,
+        usedAutoDetectedAnchor,
         anchorValue,
-        feasible: childFeeNeeded <= anchorValue,
-        additionalInputsNeeded: childFeeNeeded > anchorValue
-          ? childFeeNeeded - anchorValue
-          : 0,
+        isAnchorOutput,
+        feasible,
+        additionalInputsNeeded: feasible
+          ? 0
+          : isAnchorOutput
+            ? Math.max(0, childFeeNeeded - anchorValue)
+            : childFeeNeeded,
       };
     } catch (error: any) {
       logger.error('Error estimating fee bump', {
-        error: error.message
+        error: error.message,
+        txid: request.parentTxid,
+        anchorVout: request.anchorVout,
       });
       throw error;
     }

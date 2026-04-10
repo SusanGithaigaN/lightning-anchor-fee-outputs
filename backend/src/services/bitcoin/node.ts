@@ -18,10 +18,6 @@ export class BitcoinService {
 
     const host = process.env.BITCOIN_RPC_HOST || 'localhost';
     const port = process.env.BITCOIN_RPC_PORT || '18443';
-    // # Add this temporarily to src / services / bitcoin / node.ts constructor
-    console.log('BITCOIN_RPC_USER:', process.env.BITCOIN_RPC_USER);
-    console.log('BITCOIN_RPC_PASSWORD:', process.env.BITCOIN_RPC_PASSWORD);
-    console.log('BITCOIN_RPC_HOST:', process.env.BITCOIN_RPC_HOST);
 
     // Ensure URL has protocol
     const baseURL = host.startsWith('http')
@@ -34,6 +30,11 @@ export class BitcoinService {
         'Content-Type': 'application/json',
         'Authorization': `Basic ${auth}`,
       },
+    });
+
+    logger.info('Bitcoin RPC service initialized', {
+      baseURL,
+      network: process.env.BITCOIN_NETWORK || 'regtest',
     });
   }
 

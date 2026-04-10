@@ -26,13 +26,68 @@ interface PaymentStatus {
   amountPaid?: number;
 }
 
+function looksLikePem(value: string): boolean {
+  return value.includes('-----BEGIN');
+}
+
+function looksLikeBase64(value: string): boolean {
+  const normalized = value.replace(/\s+/g, '');
+  return normalized.length >= 100
+    && normalized.length % 4 === 0
+    && /^[A-Za-z0-9+/=]+$/.test(normalized);
+}
+
+function loadCredentialBuffer(base64Env: string, pathEnv: string, fallbackPath: string): Buffer {
+  const base64Value = process.env[base64Env]?.trim();
+  if (base64Value) {
+    return Buffer.from(base64Value, 'base64');
+  }
+
+  const configuredValue = process.env[pathEnv]?.trim();
+  if (!configuredValue) {
+    return fs.readFileSync(fallbackPath);
+  }
+
+  if (looksLikePem(configuredValue)) {
+    return Buffer.from(configuredValue, 'utf8');
+  }
+
+  if (looksLikeBase64(configuredValue)) {
+    return Buffer.from(configuredValue, 'base64');
+  }
+
+  return fs.readFileSync(configuredValue);
+}
+
+function loadMacaroonHex(fallbackPath: string): string {
+  const base64Value = process.env.LND_MACAROON_BASE64?.trim();
+  if (base64Value) {
+    return Buffer.from(base64Value, 'base64').toString('hex');
+  }
+
+  const configuredValue = process.env.LND_MACAROON_PATH?.trim();
+  if (!configuredValue) {
+    return fs.readFileSync(fallbackPath).toString('hex');
+  }
+
+  if (looksLikeBase64(configuredValue)) {
+    return Buffer.from(configuredValue, 'base64').toString('hex');
+  }
+
+  return fs.readFileSync(configuredValue).toString('hex');
+}
+
 export class LightningService {
   private lightning: any;
 
   constructor() {
     const grpcHost = process.env.LND_GRPC_HOST || 'localhost:10009';
-    const tlsCertPath = process.env.LND_TLS_CERT_PATH || './docker/lnd/tls.cert';
-    const macaroonPath = process.env.LND_MACAROON_PATH || './docker/lnd/data/chain/bitcoin/regtest/admin.macaroon';
+    const tlsCert = loadCredentialBuffer(
+      'LND_TLS_CERT_BASE64',
+      'LND_TLS_CERT_PATH',
+      './docker/lnd/tls.cert'
+    );
+    const macaroonHex = loadMacaroonHex('./docker/lnd/data/chain/bitcoin/regtest/admin.macaroon');
 
     // Load proto
     const protoPath = path.join(__dirname, 'rpc.proto');
@@ -45,40 +100,42 @@ export class LightningService {
     });
     const lnrpc = (grpc.loadPackageDefinition(packageDef) as any).lnrpc;
 
-    // TLS credentials
-    // const tlsCert = fs.readFileSync(tlsCertPath);
-    // const sslCreds = grpc.credentials.createSsl(tlsCert);
-
-    // use encoded cert from env
-    const tlsCert = process.env.LND_TLS_CERT_BASE64
-      ? Buffer.from(process.env.LND_TLS_CERT_BASE64, 'base64')
-      : fs.readFileSync(tlsCertPath);
+    // Create SSL credentials
     const sslCreds = grpc.credentials.createSsl(tlsCert);
 
-    // Macaroon credentials
-    // const macaroonHex = fs.readFileSync(macaroonPath).toString('hex');
-    const macaroonHex = process.env.LND_MACAROON_BASE64
-      ? Buffer.from(process.env.LND_MACAROON_BASE64, 'base64').toString('hex')
-      : fs.readFileSync(macaroonPath).toString('hex');
-
+    // Create macaroon credentials
     const macaroonCreds = grpc.credentials.createFromMetadataGenerator((_, callback) => {
       const metadata = new grpc.Metadata();
       metadata.add('macaroon', macaroonHex);
       callback(null, metadata);
     });
 
+    // Combine credentials
     const credentials = grpc.credentials.combineChannelCredentials(sslCreds, macaroonCreds);
 
+    // Initialize Lightning client
     this.lightning = new lnrpc.Lightning(grpcHost, credentials);
 
-    logger.info('Lightning gRPC service initialized', { grpcHost });
+    logger.info('Lightning gRPC service initialized', { 
+      grpcHost,
+      network: process.env.BITCOIN_NETWORK || 'regtest',
+      usingBase64Creds: !!process.env.LND_MACAROON_BASE64
+    });
   }
 
-  private call(method: string, params: object): Promise<any> {
+  private call(method: string, params: object, timeoutMs?: number): Promise<any> {
+    const effectiveTimeoutMs = timeoutMs ?? parseInt(process.env.LND_RPC_TIMEOUT_MS || '10000', 10);
+
     return new Promise((resolve, reject) => {
-      this.lightning[method](params, (err: any, res: any) => {
-        if (err) reject(err);
-        else resolve(res);
+      const metadata = new grpc.Metadata();
+      const deadline = new Date(Date.now() + effectiveTimeoutMs);
+
+      this.lightning[method](params, metadata, { deadline }, (err: any, res: any) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        resolve(res);
       });
     });
   }
@@ -126,7 +183,14 @@ export class LightningService {
         createdAt: new Date(),
       };
     } catch (error: any) {
-      logger.error('Error creating invoice', { error: error.message });
+      logger.error('Error creating invoice', { error: error.message, code: error.code });
+
+      if (error.code === grpc.status.DEADLINE_EXCEEDED || /deadline exceeded|timed out/i.test(error.message)) {
+        throw new Error(
+          'LND invoice request timed out. For local regtest, make sure bitcoind has a loaded wallet and mine a fresh block so the node can catch up.'
+        );
+      }
+
       throw new Error(`Failed to create invoice: ${error.message}`);
     }
   }
