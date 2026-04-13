@@ -1,6 +1,6 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { api, type FeeEstimate, type Invoice, type BroadcastResult } from "@/lib/api";
+import { api, type FeeEstimate, type Invoice, type BroadcastResult, type LightningReadiness } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { TransactionForm } from "@/components/TransactionForm";
 import { FeeEstimateDisplay } from "@/components/FeeEstimateDisplay";
@@ -17,18 +17,44 @@ import Footer from "@/components/landing/footer";
 
 export default function Index() {
   const [txid, setTxid] = useState("");
-  const [anchorIndex, setAnchorIndex] = useState(0);
-  const [targetFeeRate, setTargetFeeRate] = useState(10);
+  const [anchorIndex, setAnchorIndex] = useState(1);
+  const [targetFeeRate, setTargetFeeRate] = useState(1);
 
   const [estimate, setEstimate] = useState<FeeEstimate | null>(null);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [isPaid, setIsPaid] = useState(false);
   const [broadcastResult, setBroadcastResult] = useState<BroadcastResult | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [lndReadiness, setLndReadiness] = useState<LightningReadiness | null>(null);
 
   const [estimating, setEstimating] = useState(false);
   const [generatingInvoice, setGeneratingInvoice] = useState(false);
   const [broadcasting, setBroadcasting] = useState(false);
+
+  const refreshReadiness = useCallback(async () => {
+    try {
+      const readiness = await api.getLightningReadiness();
+      setLndReadiness(readiness);
+      return readiness;
+    } catch {
+      const fallback = {
+        readyForInvoices: false,
+        syncedToChain: false,
+        reason: "Unable to reach Lightning readiness endpoint",
+      } as LightningReadiness;
+      setLndReadiness(fallback);
+      return fallback;
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshReadiness();
+    const intervalId = window.setInterval(() => {
+      void refreshReadiness();
+    }, 15000);
+
+    return () => window.clearInterval(intervalId);
+  }, [refreshReadiness]);
 
   const handleEstimate = async (tid: string, idx: number, rate: number) => {
     setTxid(tid);
@@ -53,11 +79,18 @@ export default function Index() {
 
   const handleGenerateInvoice = async () => {
     if (!estimate) return;
+
+    const readiness = await refreshReadiness();
+    if (!readiness.readyForInvoices) {
+      toast.error(readiness.reason || "Lightning node is not ready to create invoices yet");
+      return;
+    }
+
     setGeneratingInvoice(true);
 
     try {
       const inv = await api.createInvoice(
-        estimate.totalFeeNeeded,
+        Math.max(1, estimate.childFeeNeeded),
         `CPFP fee bump for ${txid.slice(0, 8)}...`
       );
       setInvoice(inv);
@@ -136,6 +169,12 @@ export default function Index() {
                 invoice={invoice}
                 onGenerate={handleGenerateInvoice}
                 isLoading={generatingInvoice}
+                canGenerate={Boolean(lndReadiness?.readyForInvoices)}
+                readinessMessage={
+                  lndReadiness?.readyForInvoices
+                    ? `Lightning ready at block ${lndReadiness.blockHeight ?? "-"}`
+                    : lndReadiness?.reason || "Lightning node is still syncing. Mine a few blocks and try again."
+                }
               />
             )}
 

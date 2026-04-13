@@ -28,12 +28,21 @@ export function FeeEstimateDisplay({ estimate }: FeeEstimateDisplayProps) {
           </div>
         </div>
 
-        {estimate.parentFeeRate !== undefined && (
-          <div className="rounded-lg bg-muted p-3">
-            <p className="text-xs text-muted-foreground">Parent Fee Rate</p>
-            <p className="font-mono">{estimate.parentFeeRate} sat/vB</p>
-          </div>
-        )}
+        <div className="grid grid-cols-2 gap-4">
+          {estimate.parentFeeRate !== undefined && (
+            <div className="rounded-lg bg-muted p-3">
+              <p className="text-xs text-muted-foreground">Parent Fee Rate</p>
+              <p className="font-mono">{estimate.parentFeeRate} sat/vB</p>
+            </div>
+          )}
+
+          {estimate.anchorValue !== undefined && (
+            <div className="rounded-lg bg-muted p-3">
+              <p className="text-xs text-muted-foreground">Selected Output Value</p>
+              <p className="font-mono">{estimate.anchorValue} sats</p>
+            </div>
+          )}
+        </div>
 
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">330-sat anchor feasible:</span>
@@ -50,7 +59,9 @@ export function FeeEstimateDisplay({ estimate }: FeeEstimateDisplayProps) {
 
         {!estimate.feasible && (
           <p className="text-sm text-destructive">
-            The 330-sat anchor output is insufficient for this fee bump. A higher anchor value may be needed.
+            {estimate.isAnchorOutput === false
+              ? `The selected output is ${estimate.anchorValue ?? 0} sats, not a 330-sat anchor. Try the correct output index for the commitment tx.`
+              : `At this target rate, the 330-sat anchor is short by ${estimate.additionalInputsNeeded ?? 0} sats. On local regtest, try 1 sat/vB.`}
           </p>
         )}
       </CardContent>

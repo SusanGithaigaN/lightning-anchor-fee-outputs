@@ -9,9 +9,17 @@ interface InvoiceDisplayProps {
   invoice: Invoice | null;
   onGenerate: () => void;
   isLoading: boolean;
+  canGenerate: boolean;
+  readinessMessage?: string;
 }
 
-export function InvoiceDisplay({ invoice, onGenerate, isLoading }: InvoiceDisplayProps) {
+export function InvoiceDisplay({
+  invoice,
+  onGenerate,
+  isLoading,
+  canGenerate,
+  readinessMessage,
+}: InvoiceDisplayProps) {
   const copyInvoice = () => {
     if (invoice) {
       navigator.clipboard.writeText(invoice.invoice);
@@ -29,19 +37,28 @@ export function InvoiceDisplay({ invoice, onGenerate, isLoading }: InvoiceDispla
       </CardHeader>
       <CardContent className="space-y-4">
         {!invoice ? (
-          <Button onClick={onGenerate} disabled={isLoading} className="w-full bg-secondary hover:bg-secondary/90">
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Zap className="mr-2 h-4 w-4" />
-                Generate Lightning Invoice
-              </>
+          <>
+            <Button
+              onClick={onGenerate}
+              disabled={isLoading || !canGenerate}
+              className="w-full bg-secondary hover:bg-secondary/90"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Zap className="mr-2 h-4 w-4" />
+                  Generate Lightning Invoice
+                </>
+              )}
+            </Button>
+            {readinessMessage && (
+              <p className="text-xs text-muted-foreground">{readinessMessage}</p>
             )}
-          </Button>
+          </>
         ) : (
           <>
             <div className="flex justify-center rounded-lg bg-foreground/5 p-6">

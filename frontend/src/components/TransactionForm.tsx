@@ -14,14 +14,14 @@ const TXID_REGEX = /^[a-fA-F0-9]{64}$/;
 
 const FEE_PRESETS = [
   { label: "Low", value: 1 },
-  { label: "Medium", value: 10 },
-  { label: "High", value: 50 },
+  { label: "Medium", value: 2 },
+  { label: "High", value: 5 },
 ] as const;
 
 export function TransactionForm({ onEstimate, isLoading }: TransactionFormProps) {
   const [txid, setTxid] = useState("");
-  const [anchorIndex, setAnchorIndex] = useState("0");
-  const [targetFeeRate, setTargetFeeRate] = useState("10");
+  const [anchorIndex, setAnchorIndex] = useState("1");
+  const [targetFeeRate, setTargetFeeRate] = useState("1");
   const [error, setError] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -123,6 +123,9 @@ export function TransactionForm({ onEstimate, isLoading }: TransactionFormProps)
                   </button>
                 ))}
               </div>
+              <p className="text-xs text-muted-foreground">
+                For local `regtest`, start with `anchor index 1` and `1 sat/vB`.
+              </p>
             </div>
           </div>
 

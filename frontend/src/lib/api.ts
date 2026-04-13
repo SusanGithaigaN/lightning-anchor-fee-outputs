@@ -27,8 +27,11 @@ export interface FeeEstimate {
   childFeeNeeded: number;
   feasible: boolean;
   totalFeeNeeded: number;
-  parentTxSize?: number;
+  parentSize?: number;
   parentFeeRate?: number;
+  anchorValue?: number;
+  additionalInputsNeeded?: number;
+  isAnchorOutput?: boolean;
 }
 
 export interface Invoice {
@@ -57,11 +60,21 @@ export interface MonitorStatus {
   trackedTransactions?: number;
 }
 
+export interface LightningReadiness {
+  readyForInvoices: boolean;
+  syncedToChain: boolean;
+  blockHeight?: number;
+  alias?: string;
+  identityPubkey?: string;
+  network?: string;
+  reason?: string;
+}
+
 export const api = {
   estimateFee: (txid: string, anchorIndex: number, targetFeeRate: number) =>
     request<FeeEstimate>("/feebump/estimate", {
       method: "POST",
-      body: JSON.stringify({ txid, anchorIndex, targetFeeRate }),
+      body: JSON.stringify({ txid, anchorVout: anchorIndex, targetFeeRate }),
     }),
 
   createInvoice: (amountSats: number, memo?: string) =>
@@ -76,16 +89,18 @@ export const api = {
   createFeeBump: (txid: string, anchorIndex: number, targetFeeRate: number) =>
     request<BroadcastResult>("/feebump/create", {
       method: "POST",
-      body: JSON.stringify({ txid, anchorIndex, targetFeeRate }),
+      body: JSON.stringify({ txid, anchorVout: anchorIndex, targetFeeRate }),
     }),
 
   broadcastFeeBump: (txid: string, anchorIndex: number, targetFeeRate: number, paymentHash: string) =>
     request<BroadcastResult>("/feebump/broadcast", {
       method: "POST",
-      body: JSON.stringify({ txid, anchorIndex, targetFeeRate, paymentHash }),
+      body: JSON.stringify({ txid, anchorVout: anchorIndex, targetFeeRate, paymentHash }),
     }),
 
   getBlockchainInfo: () => request<BlockchainInfo>("/bitcoin/info"),
+
+  getLightningReadiness: () => request<LightningReadiness>("/lightning/readiness"),
 
   startMonitoring: () =>
     request<{ message: string }>("/monitor/start", { method: "POST" }),

@@ -45,9 +45,12 @@ router.post('/create-invoice', async (req: Request, res: Response) => {
         });
     } catch (error: any) {
         logger.error('Error creating invoice', { error: error.message });
-        res.status(500).json({
+
+        const isTimeout = /timed out|deadline exceeded/i.test(error.message);
+
+        res.status(isTimeout ? 503 : 500).json({
             success: false,
-            error: 'Failed to create invoice',
+            error: isTimeout ? 'Lightning node not ready' : 'Failed to create invoice',
             details: error.message,
         });
     }

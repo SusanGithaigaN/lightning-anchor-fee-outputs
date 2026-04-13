@@ -52,14 +52,14 @@ services:
     image: postgres:16-alpine
     container_name: postgres-db
     ports:
-      - "5433:5432"  
+      - "5433:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: anchor_service
       PGPORT: 5432
     volumes:
-      - ./docker/postgres:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
 
   redis:
     image: redis:7-alpine
@@ -69,3 +69,6 @@ services:
     command: redis-server --port 6379
     volumes:
       - ./docker/redis:/data
+
+volumes:
+  postgres_data:
