@@ -19,6 +19,13 @@ export function StatusDashboard() {
     retry: 1,
   });
 
+  const { data: lightningReadiness } = useQuery({
+    queryKey: ["lightning-readiness"],
+    queryFn: api.getLightningReadiness,
+    refetchInterval: 15000,
+    retry: 1,
+  });
+
   return (
     <Card>
       <CardHeader>
@@ -51,6 +58,15 @@ export function StatusDashboard() {
             <Badge className="bg-success text-success-foreground">Active</Badge>
           ) : (
             <Badge variant="outline">Inactive</Badge>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between rounded-lg bg-muted p-3">
+          <span className="text-sm">Lightning Invoicing</span>
+          {lightningReadiness?.readyForInvoices ? (
+            <Badge className="bg-success text-success-foreground">Ready</Badge>
+          ) : (
+            <Badge variant="outline">Syncing</Badge>
           )}
         </div>
 

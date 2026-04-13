@@ -60,6 +60,16 @@ export interface MonitorStatus {
   trackedTransactions?: number;
 }
 
+export interface LightningReadiness {
+  readyForInvoices: boolean;
+  syncedToChain: boolean;
+  blockHeight?: number;
+  alias?: string;
+  identityPubkey?: string;
+  network?: string;
+  reason?: string;
+}
+
 export const api = {
   estimateFee: (txid: string, anchorIndex: number, targetFeeRate: number) =>
     request<FeeEstimate>("/feebump/estimate", {
@@ -89,6 +99,8 @@ export const api = {
     }),
 
   getBlockchainInfo: () => request<BlockchainInfo>("/bitcoin/info"),
+
+  getLightningReadiness: () => request<LightningReadiness>("/lightning/readiness"),
 
   startMonitoring: () =>
     request<{ message: string }>("/monitor/start", { method: "POST" }),
