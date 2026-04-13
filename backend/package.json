@@ -1,10 +1,10 @@
 {
   "scripts": {
-    "start": "npm run dev",
+    "start": "node dist/index.js",
     "dev": "nodemon --exec ts-node src/index.ts",
     "build": "tsc && mkdir -p dist/services/lightning && cp src/services/lightning/rpc.proto dist/services/lightning/",
     "serve": "node dist/index.js",
-    "start:prod": "npm run serve",
+    "start:prod": "node dist/index.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",

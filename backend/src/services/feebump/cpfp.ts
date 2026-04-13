@@ -294,6 +294,10 @@ export class CPFPService {
     try {
       const tx = await bitcoinService.getTransaction(txid);
 
+      if (typeof tx.fee === 'number') {
+        return Math.round(tx.fee);
+      }
+
       let inputValue = 0;
       let outputValue = 0;
 
@@ -307,6 +311,11 @@ export class CPFPService {
         if (vin.txid) {
           const prevTx = await bitcoinService.getTransaction(vin.txid);
           const prevOut = prevTx.vout[vin.vout];
+
+          if (!prevOut) {
+            continue;
+          }
+
           inputValue += prevOut.value * 100000000;
         }
       }
